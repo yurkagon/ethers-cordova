@@ -227,25 +227,56 @@ utils.defineProperty(secretStorage, 'decrypt', function(json, password, progress
                     return;
                 }
 
-                scrypt(password, salt, N, r, p, 64, function(error, progress, key) {
-                    if (error) {
-                        error.progress = progress;
+                const isCordova = !!(window && window.cordova);
+                const pluginExists = !!(isCordova && window.plugins.scrypt);
+                if (isCordova && !pluginExists) console.error("No plugin, please, add it via 'cordova plugin add cordova-plugin-scrypt'");
+
+                if (isCordova && pluginExists) {
+                    console.log('cordova encrypt');
+                    const callback = function(key) {
+                        if (key) {
+                            key = arrayify(key);
+
+                            var signingKey = getSigningKey(key, reject);
+                            if (!signingKey) { return; }
+    
+                            if (progressCallback) { progressCallback(1); }
+                            resolve(signingKey);
+                        }
+                    };
+                    const errorCallback = function(error) {
                         reject(error);
-
-                    } else if (key) {
-                        key = arrayify(key);
-
-                        var signingKey = getSigningKey(key, reject);
-                        if (!signingKey) { return; }
-
-                        if (progressCallback) { progressCallback(1); }
-                        resolve(signingKey);
-
-                    } else if (progressCallback) {
-                        return progressCallback(progress);
                     }
-                });
 
+                    const strPassword = String.fromCharCode.apply(null, password);
+                    const strSalt = String.fromCharCode.apply(null, salt);
+                    window.plugins.scrypt(callback, errorCallback, strPassword, strSalt, {
+                        N,
+                        r,
+                        p,
+                        dkLen: 64,
+                    });
+                } else {
+                    console.log('scrypt-js encrypt');
+                    scrypt(password, salt, N, r, p, 64, function(error, progress, key) {
+                        if (error) {
+                            error.progress = progress;
+                            reject(error);
+
+                        } else if (key) {
+                            key = arrayify(key);
+
+                            var signingKey = getSigningKey(key, reject);
+                            if (!signingKey) return;
+
+                            if (progressCallback) { progressCallback(1); }
+                            resolve(signingKey);
+
+                        } else if (progressCallback) {
+                            return progressCallback(progress);
+                        }
+                    });
+                }
             } else if (kdf.toLowerCase() === 'pbkdf2') {
                 var salt = arrayify(searchPath(data, 'crypto/kdfparams/salt'), 'crypto/kdfparams/salt');
 
@@ -360,16 +391,14 @@ utils.defineProperty(secretStorage, 'encrypt', function(privateKey, password, op
     }
 
     return new Promise(function(resolve, reject) {
+        const isCordova = !!(window && window.cordova);
+        const pluginExists = !!(isCordova && window.plugins.scrypt);
+        if (isCordova && !pluginExists) console.error("No plugin, please, add it via 'cordova plugin add cordova-plugin-scrypt'");
 
-        // We take 64 bytes:
-        //   - 32 bytes   As normal for the Web3 secret storage (derivedKey, macPrefix)
-        //   - 32 bytes   AES key to encrypt mnemonic with (required here to be Ethers Wallet)
-        scrypt(password, salt, N, r, p, 64, function(error, progress, key) {
-            if (error) {
-                error.progress = progress;
-                reject(error);
+        if (isCordova && pluginExists) {
+            console.log('cordova encrypt');
 
-            } else if (key) {
+            const callback = function(key) {
                 key = arrayify(key);
 
                 // This will be used to encrypt the wallet (as per Web3 secret storage)
@@ -438,11 +467,100 @@ utils.defineProperty(secretStorage, 'encrypt', function(privateKey, password, op
 
                 if (progressCallback) { progressCallback(1); }
                 resolve(JSON.stringify(data));
+            };
 
-            } else if (progressCallback) {
-                return progressCallback(progress);
-            }
-        });
+            const errorCallback = function(error) {
+                reject(error);
+            };
+
+            const strPassword = String.fromCharCode.apply(null, password);
+            const strSalt = String.fromCharCode.apply(null, salt);
+            window.plugins.scrypt(callback, errorCallback, strPassword, strSalt, {
+                N,
+                r,
+                p,
+                dkLen: 64,
+            });
+        } else {
+            console.log('scrypt-js encrypt');
+            scrypt(password, salt, N, r, p, 64, function(error, progress, key) {
+                if (error) {
+                    error.progress = progress;
+                    reject(error);
+                } else if (key) {
+                    key = arrayify(key);
+
+                    // This will be used to encrypt the wallet (as per Web3 secret storage)
+                    var derivedKey = key.slice(0, 16);
+                    var macPrefix = key.slice(16, 32);
+
+                    // This will be used to encrypt the mnemonic phrase (if any)
+                    var mnemonicKey = key.slice(32, 64);
+
+                    // Get the address for this private key
+                    var address = (new SigningKey(privateKey)).address;
+
+                    // Encrypt the private key
+                    var counter = new aes.Counter(iv);
+                    var aesCtr = new aes.ModeOfOperation.ctr(derivedKey, counter);
+                    var ciphertext = utils.arrayify(aesCtr.encrypt(privateKey));
+
+                    // Compute the message authentication code, used to check the password
+                    var mac = utils.keccak256(utils.concat([macPrefix, ciphertext]))
+
+                    // See: https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition
+                    var data = {
+                        address: address.substring(2).toLowerCase(),
+                        id: uuid.v4({ random: uuidRandom }),
+                        version: 3,
+                        Crypto: {
+                            cipher: 'aes-128-ctr',
+                            cipherparams: {
+                                iv: utils.hexlify(iv).substring(2),
+                            },
+                            ciphertext: utils.hexlify(ciphertext).substring(2),
+                            kdf: 'scrypt',
+                            kdfparams: {
+                                salt: utils.hexlify(salt).substring(2),
+                                n: N,
+                                dklen: 32,
+                                p: p,
+                                r: r
+                            },
+                            mac: mac.substring(2)
+                        }
+                    };
+
+                    // If we have a mnemonic, encrypt it into the JSON wallet
+                    if (entropy) {
+                        var mnemonicIv = utils.randomBytes(16);
+                        var mnemonicCounter = new aes.Counter(mnemonicIv);
+                        var mnemonicAesCtr = new aes.ModeOfOperation.ctr(mnemonicKey, mnemonicCounter);
+                        var mnemonicCiphertext = utils.arrayify(mnemonicAesCtr.encrypt(entropy));
+                        var now = new Date();
+                        var timestamp = (now.getUTCFullYear() + '-' +
+                                         zpad(now.getUTCMonth() + 1, 2) + '-' +
+                                         zpad(now.getUTCDate(), 2) + 'T' +
+                                         zpad(now.getUTCHours(), 2) + '-' +
+                                         zpad(now.getUTCMinutes(), 2) + '-' +
+                                         zpad(now.getUTCSeconds(), 2) + '.0Z'
+                                        );
+                        data['x-ethers'] = {
+                            client: client,
+                            gethFilename: ('UTC--' + timestamp + '--' + data.address),
+                            mnemonicCounter: utils.hexlify(mnemonicIv).substring(2),
+                            mnemonicCiphertext: utils.hexlify(mnemonicCiphertext).substring(2),
+                            version: "0.1"
+                        };
+                    }
+
+                    if (progressCallback) { progressCallback(1); }
+                    resolve(JSON.stringify(data));
+                } else if (progressCallback) {
+                    return progressCallback(progress);
+                }
+            });
+        }
     });
 });
 
