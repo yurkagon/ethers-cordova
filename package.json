@@ -1,6 +1,6 @@
 {
   "name": "ethers-cordova",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Ethereum wallet library, modifed for getting more perfomance on mobile",
   "main": "index.js",
   "scripts": {
@@ -45,7 +45,10 @@
   },
   "keywords": [
     "ethereum",
-    "wallet"
+    "wallet",
+    "cordova",
+    "IOS",
+    "Android"
   ],
   "authors": [
     "Richard Moore <me@ricmoo.com>",
