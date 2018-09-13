@@ -1,7 +1,7 @@
 {
-  "name": "ethers",
-  "version": "3.0.27",
-  "description": "Ethereum wallet library.",
+  "name": "ethers-cordova",
+  "version": "1.0.0",
+  "description": "Ethereum wallet library, modifed for getting more perfomance on mobile",
   "main": "index.js",
   "scripts": {
     "eslint": "eslint index.js contracts/*.js providers/*.js utils/*.js wallet/*.js",
@@ -47,10 +47,13 @@
     "ethereum",
     "wallet"
   ],
-  "author": "Richard Moore <me@ricmoo.com>",
+  "authors": [
+    "Richard Moore <me@ricmoo.com>",
+    "Yura Khvyshchuk <owngameplay@gmail.com> (https://github.com/yurkagon)"
+  ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/ethers-io/ethers-wallet.git"
+    "url": "git://github.com/yurkagon/ethers-cordova.git"
   },
   "license": "MIT"
 }
