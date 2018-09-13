@@ -227,13 +227,13 @@ utils.defineProperty(secretStorage, 'decrypt', function(json, password, progress
                     return;
                 }
 
-                const isCordova = !!(window && window.cordova);
-                const pluginExists = !!(isCordova && window.plugins.scrypt);
+                var isCordova = !!(window && window.cordova);
+                var pluginExists = !!(isCordova && window.plugins.scrypt);
                 if (isCordova && !pluginExists) console.error("No plugin, please, add it via 'cordova plugin add cordova-plugin-scrypt'");
 
                 if (isCordova && pluginExists) {
                     console.log('cordova encrypt');
-                    const callback = function(key) {
+                    var callback = function(key) {
                         if (key) {
                             key = arrayify(key);
 
@@ -244,16 +244,16 @@ utils.defineProperty(secretStorage, 'decrypt', function(json, password, progress
                             resolve(signingKey);
                         }
                     };
-                    const errorCallback = function(error) {
+                    var errorCallback = function(error) {
                         reject(error);
                     }
 
-                    const strPassword = String.fromCharCode.apply(null, password);
-                    const strSalt = String.fromCharCode.apply(null, salt);
+                    var strPassword = String.fromCharCode.apply(null, password);
+                    var strSalt = String.fromCharCode.apply(null, salt);
                     window.plugins.scrypt(callback, errorCallback, strPassword, strSalt, {
-                        N,
-                        r,
-                        p,
+                        N: N,
+                        r: r,
+                        p: p,
                         dkLen: 64,
                     });
                 } else {
@@ -391,14 +391,14 @@ utils.defineProperty(secretStorage, 'encrypt', function(privateKey, password, op
     }
 
     return new Promise(function(resolve, reject) {
-        const isCordova = !!(window && window.cordova);
-        const pluginExists = !!(isCordova && window.plugins.scrypt);
+        var isCordova = !!(window && window.cordova);
+        var pluginExists = !!(isCordova && window.plugins.scrypt);
         if (isCordova && !pluginExists) console.error("No plugin, please, add it via 'cordova plugin add cordova-plugin-scrypt'");
 
         if (isCordova && pluginExists) {
             console.log('cordova encrypt');
 
-            const callback = function(key) {
+            var callback = function(key) {
                 key = arrayify(key);
 
                 // This will be used to encrypt the wallet (as per Web3 secret storage)
@@ -469,16 +469,16 @@ utils.defineProperty(secretStorage, 'encrypt', function(privateKey, password, op
                 resolve(JSON.stringify(data));
             };
 
-            const errorCallback = function(error) {
+            var errorCallback = function(error) {
                 reject(error);
             };
 
-            const strPassword = String.fromCharCode.apply(null, password);
-            const strSalt = String.fromCharCode.apply(null, salt);
+            var strPassword = String.fromCharCode.apply(null, password);
+            var strSalt = String.fromCharCode.apply(null, salt);
             window.plugins.scrypt(callback, errorCallback, strPassword, strSalt, {
-                N,
-                r,
-                p,
+                N: N,
+                r: r,
+                p: p,
                 dkLen: 64,
             });
         } else {
