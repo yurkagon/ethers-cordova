@@ -1,0 +1,8 @@
+Gruntfile.js
+Gruntfile-test.js
+
+# If you need these, checkout GitHub
+examples/
+
+# To run tests, checkout GitHub
+tests/
